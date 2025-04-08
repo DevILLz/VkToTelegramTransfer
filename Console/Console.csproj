@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="NewFolder1\**" />
+    <EmbeddedResource Remove="NewFolder1\**" />
+    <None Remove="NewFolder1\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VkToTelegramLib.Db\VkToTelegramLib.Db.csproj" />
+    <ProjectReference Include="..\VkToTelegramLib.Telegram\VkToTelegramLib.Telegram.csproj" />
+    <ProjectReference Include="..\VkToTelegramLib.Vk\VkToTelegramLib.Vk.csproj" />
+  </ItemGroup>
+
+</Project>
