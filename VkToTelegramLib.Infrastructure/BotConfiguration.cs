@@ -3,7 +3,7 @@ namespace VkToTelegramLib.Infrastructure;
 
 public class BotConfiguration
 {
-    public static string BaseDirectory { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\HotBike";
+    public static string BaseDirectory { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\VkToTelegram";
     public static string ConfigFileName { get; set; } = "configuration.cfg";
     public string TelegramToken { get; set; }
     public string VkServiceKey { get; set; }
@@ -29,16 +29,16 @@ public class BotConfiguration
             VkRequestAttributes = 
             [
                 new VkRequestAttribute("Version", "v", "5.199"),
-                new VkRequestAttribute("Domain", "domain", "goryachievelomany"),
                 new VkRequestAttribute("Filter", "filter", "owner"),
                 new VkRequestAttribute("Count", "count", "15"),
+                new VkRequestAttribute("Domain", "domain", "undefined"),
             ],
-            TelegramChatId = -1002484373576, // -1002540846422 - test
             VkGetPostsUrl = "https://api.vk.com/method/wall.get",
             StartCheckDate = DateTime.Parse("07.04.25"),
 
-            UrlPartDificultiesVK = "wall-226433411_294",
-            UrlDificultiesTG = "https://t.me/HotBikeYar/89",
+            TelegramChatId = 0,
+            UrlPartDificultiesVK = "undefined",
+            UrlDificultiesTG = "undefined",
         };
     }
     public static BotConfiguration GetOrCreateConfig()

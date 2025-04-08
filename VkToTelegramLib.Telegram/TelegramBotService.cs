@@ -118,9 +118,12 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
         string pattern = @"\[(https?:\/\/[^\|\]]+)\|([^\]]+)\]";
         string resultText = Regex.Replace(vkPost.Text, pattern, m =>
         {
-            string url = m.Groups[1].Value.Contains(config.UrlPartDificultiesVK) 
-            ? config.UrlDificultiesTG 
-            : m.Groups[1].Value;
+            string url = m.Groups[1].Value;
+
+            if (config.UrlPartDificultiesVK != "undefined" && config.UrlDificultiesTG != "undefined")
+                url = m.Groups[1].Value.Contains(config.UrlPartDificultiesVK)
+                    ? config.UrlDificultiesTG
+                    : m.Groups[1].Value;
 
             string text = m.Groups[2].Value;
             
