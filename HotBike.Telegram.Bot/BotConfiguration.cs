@@ -9,7 +9,6 @@ public class BotConfiguration
     public static string ConfigFileName { get; set; } = "configuration.cfg";
     public string TelegramToken { get; set; }
     public string VkToken { get; set; }
-    public List<VkRequestAttribute> VkRequestAttributes { get; set; }
     public long TelegramChatId { get; set; }
     public string VkGetPostsUrl { get; set; }
     public DateTime StartCheckDate { get; set; }
@@ -18,6 +17,7 @@ public class BotConfiguration
     public string UrlPartDificultiesVK { get; set; }
     public string UrlDificultiesTG { get; set; }
 
+    public List<VkRequestAttribute> VkRequestAttributes { get; set; }
 
     internal static BotConfiguration GetDefaults()
     {
@@ -73,5 +73,5 @@ public class BotConfiguration
             return GetDefaults();
         }
     }
-    public record VkRequestAttribute(string Name, string Atribute, string DefaultValue);
+    public record VkRequestAttribute(string Name, string Atribute, string Value);
 }

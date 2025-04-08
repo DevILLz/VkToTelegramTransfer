@@ -6,6 +6,7 @@ using LiteDB;
 using System.Text.RegularExpressions;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
+using Microsoft.Extensions.Hosting;
 
 namespace HotBike.Telegram.Bot;
 public partial class TelegramBot : IDisposable
@@ -77,7 +78,12 @@ public partial class TelegramBot : IDisposable
         latestPosts.Reverse(); // в обратном порядке публикуем
         foreach (var post in latestPosts)
         {
+            Console.WriteLine($"Проверка поста {post.Id}. Текст: {post.Text.Take(30)}...");
             var messageLink = context.GetMessageLink(post);
+
+            if (messageLink?.VkMessageHash is null)
+                Console.WriteLine($"Данный пост еще не был опубликован");
+
             if (messageLink?.VkMessageHash is null || (messageLink.Edited != post.Edited && messageLink.DateTime >= DateTime.Now.AddDays(-7)))
             { // если пост старше недели и он уже был опубликован, то не может быть отредактирован (ограничения ВК)
                 await SendOrUpdatePostToGroup(post, messageLink?.TelegramMessageId);
@@ -95,6 +101,8 @@ public partial class TelegramBot : IDisposable
 
         if (photo is null || vkPost.Text.Length > 1024)
         {
+            Console.WriteLine($"В данном посте либо нет фотографии, либо текст слишком длинный для подобного поста, публикуем как текст");
+
             if (vkPost.Text.Length > 4096)
                 return; // TODO: разделять на несколько постов
             // или в комментарии добавлять остаток текста
@@ -103,8 +111,13 @@ public partial class TelegramBot : IDisposable
             if (telegramMessageId is null || telegramMessageId == 0)
                 telegramMessageId = (await bot.SendMessage(new ChatId(config.TelegramChatId), vkPost.Text + addiditionalInfo)).Id;
             else
+            {
+                Console.WriteLine($"Посты уже был опубликован, пытаемся обновить...");
                 await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId.Value, vkPost.Text + addiditionalInfo);
+                Console.WriteLine($"Пост обновлен");
+            }
 
+            
             context.AddOrUpdatePostInDb(vkPost, telegramMessageId.Value);
             return;
         }
@@ -126,6 +139,7 @@ public partial class TelegramBot : IDisposable
             telegramMessageId = (await bot.SendPhoto(new ChatId(config.TelegramChatId), photo, resultText + addiditionalInfo, ParseMode.Html)).Id;
         else
         {
+            Console.WriteLine($"Посты уже был опубликован, пытаемся обновить...");
             if (photo is not null)
             {
                 await bot.EditMessageCaption(new ChatId(config.TelegramChatId), telegramMessageId.Value, vkPost.Text + addiditionalInfo);
@@ -135,6 +149,7 @@ public partial class TelegramBot : IDisposable
             }
             else
                 await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId.Value, vkPost.Text + addiditionalInfo);
+            Console.WriteLine($"Пост обновлен");
         }
         
         context.AddOrUpdatePostInDb(vkPost, telegramMessageId.Value);

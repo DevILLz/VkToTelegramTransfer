@@ -23,9 +23,10 @@ namespace HotBike.Telegram.Bot
             var filtredPosts = posts
                 .Where(p => p.DateTime >= config.StartCheckDate) // скипаем все посты до нужной даты
                 .Where(p => p.CopyHistory is null) // скипаем все репосты
-                ;
+                .ToList();
 
-            return [.. filtredPosts];
+            Console.WriteLine($"Постов после фильтрации по дате и исключения репостов: {filtredPosts.Count}");
+            return filtredPosts;
         }
 
         private async Task<List<Post>> GetLatestVkPosts()
@@ -35,8 +36,12 @@ namespace HotBike.Telegram.Bot
 
             try
             {
+                var countAttributeValue = config.VkRequestAttributes.FirstOrDefault(a => a.Name == "Count")?.Value;
+                Console.WriteLine($"Получение последних {countAttributeValue} постов из ВК");
+
                 HttpResponseMessage response = await client.GetAsync(GetVkPostsRequestUrl());
                 response.EnsureSuccessStatusCode(); // Выбрасывает исключение, если код статуса не успешный
+
 
                 // Читаем ответ как строку
                 string responseBody = await response.Content.ReadAsStringAsync();
@@ -44,6 +49,8 @@ namespace HotBike.Telegram.Bot
 
                 if (responseObject is null)
                     throw new Exception("Не удалось распознать ответ сервера");
+
+                Console.WriteLine($"Получено {responseObject.Response.Items.Count} постов");
 
                 return responseObject.Response.Items;
             }
@@ -64,7 +71,7 @@ namespace HotBike.Telegram.Bot
                 request.Append('?');
 
             foreach (var item in config.VkRequestAttributes)
-                request.Append($"{item.Atribute}={item.DefaultValue}&");
+                request.Append($"{item.Atribute}={item.Value}&");
 
             request.Remove(request.Length - 1, 1);
 

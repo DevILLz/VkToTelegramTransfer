@@ -8,6 +8,7 @@ public class DbContext
     private string fullDbPath = BotConfiguration.BaseDirectory + "/HotBikeBot.db";
     public void AddOrUpdatePostInDb(Post post, int tgMessageId)
     {
+        Console.WriteLine("Публикация в телеграмме прошла успешно, отправляем в БД");
         try
         {
             using (var db = new LiteDatabase(fullDbPath))
@@ -35,11 +36,12 @@ public class DbContext
                     });
                 }
             }
+
+            Console.WriteLine("Бд обновлена");
         }
         catch (Exception e)
         {
-            Console.WriteLine(e.Message);
-            throw;
+            Console.WriteLine("Ошибка при обновлении БД: ", e.Message);
         }
     }
 
