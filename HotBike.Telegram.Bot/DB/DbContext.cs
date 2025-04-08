@@ -1,7 +1,7 @@
-﻿using HotBike.Telegram.Bot.Objects;
+﻿using HotBike.Telegram.Bot.Services.VkResponseObjects;
 using LiteDB;
 
-namespace HotBike.Telegram.Bot;
+namespace HotBike.Telegram.Bot.DB;
 
 public class DbContext
 {

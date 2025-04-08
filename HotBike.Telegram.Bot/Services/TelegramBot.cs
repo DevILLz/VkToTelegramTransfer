@@ -1,32 +1,24 @@
 ﻿using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Polling;
-using HotBike.Telegram.Bot.Objects;
 using LiteDB;
 using System.Text.RegularExpressions;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
-using Microsoft.Extensions.Hosting;
+using HotBike.Telegram.Bot.Interfaces;
+using HotBike.Telegram.Bot.DB;
+using HotBike.Telegram.Bot.Services.VkResponseObjects;
 
-namespace HotBike.Telegram.Bot;
-public partial class TelegramBot : IDisposable
+namespace HotBike.Telegram.Bot.Services;
+public partial class TelegramBot(BotConfiguration config, IVkApi vkApi, DbContext context) : IDisposable
 {
-    private readonly ITelegramBotClient bot;
-    private readonly IVkApi vkApi;
-    private readonly DbContext context;
-    private readonly BotConfiguration config;
-    private string telegramToken;
+    private readonly ITelegramBotClient bot = new TelegramBotClient(config.TelegramToken);
+    private readonly IVkApi vkApi = vkApi;
+    private readonly DbContext context = context;
+    private readonly BotConfiguration config = config;
     private Timer checkTimer;
 
     public bool Initialized { get; private set; }
-
-    public TelegramBot(BotConfiguration config, IVkApi vkApi, DbContext context)
-    {
-        this.config = config;
-        this.vkApi = vkApi;
-        this.context = context;
-        bot = new TelegramBotClient(telegramToken = config.TelegramToken);
-    }
 
     public void StartBot()
     {
@@ -84,7 +76,7 @@ public partial class TelegramBot : IDisposable
             if (messageLink?.VkMessageHash is null)
                 Console.WriteLine($"Данный пост еще не был опубликован");
 
-            if (messageLink?.VkMessageHash is null || (messageLink.Edited != post.Edited && messageLink.DateTime >= DateTime.Now.AddDays(-7)))
+            if (messageLink?.VkMessageHash is null || messageLink.Edited != post.Edited && messageLink.DateTime >= DateTime.Now.AddDays(-7))
             { // если пост старше недели и он уже был опубликован, то не может быть отредактирован (ограничения ВК)
                 await SendOrUpdatePostToGroup(post, messageLink?.TelegramMessageId);
                 continue;
@@ -217,7 +209,7 @@ public partial class TelegramBot : IDisposable
         }
     }
 
-    private async Task OnMessage(ITelegramBotClient botClient, Message? message, CancellationToken cancellationToken)
+    private async Task OnMessage(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
     {
         var textCommands = new string[]
         {
@@ -263,12 +255,13 @@ public partial class TelegramBot : IDisposable
     private async Task HandleError(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
     {
         // Некоторые действия
+        await Task.Delay(0);
         Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(exception));
     }
 
     public void Dispose()
     {
-        checkTimer.Dispose();
+        checkTimer?.Dispose();
         bot.Close();
     }
 }

@@ -1,4 +1,6 @@
 ﻿using HotBike.Telegram.Bot;
+using HotBike.Telegram.Bot.DB;
+using HotBike.Telegram.Bot.Services;
 
 TelegramBot bot = null;
 
@@ -12,11 +14,11 @@ try
     bot = new TelegramBot(config, vkApi, dbContext);
     await Task.Run(bot.StartBot);
 }
-catch (Exception e)
+catch (Exception)
 {
     Console.WriteLine($"Возникли проблемы при запуске бота... \n" +
         $"Проверьте конфигурационный файл: \n {BotConfiguration.BaseDirectory}\\{BotConfiguration.ConfigFileName}\n" +
-        $"Возможно не заданы токены телеграмма и ВК");
+        $"");
 }
 
 if (bot?.Initialized ?? false)
@@ -26,3 +28,4 @@ Console.ReadLine();
 
 
 //https://github.com/TelegramBots/Telegram.Bot
+//https://dev.vk.com/ru/method/wall

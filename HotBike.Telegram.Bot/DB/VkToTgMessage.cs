@@ -1,4 +1,4 @@
-﻿namespace HotBike.Telegram.Bot;
+﻿namespace HotBike.Telegram.Bot.DB;
 public class VkToTgMessage
 {
     public Guid Id { get; set; }

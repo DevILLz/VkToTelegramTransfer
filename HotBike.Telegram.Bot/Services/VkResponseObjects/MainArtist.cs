@@ -1,5 +1,5 @@
 ﻿//using Newtonsoft.Json;
-namespace HotBike.Telegram.Bot.Objects;
+namespace HotBike.Telegram.Bot.Services.VkResponseObjects;
 
 public class MainArtist
 {

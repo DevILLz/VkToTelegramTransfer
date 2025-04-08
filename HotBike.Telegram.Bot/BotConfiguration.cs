@@ -1,6 +1,4 @@
 ﻿using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
-
 namespace HotBike.Telegram.Bot;
 
 public class BotConfiguration
@@ -8,7 +6,8 @@ public class BotConfiguration
     public static string BaseDirectory { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\HotBike";
     public static string ConfigFileName { get; set; } = "configuration.cfg";
     public string TelegramToken { get; set; }
-    public string VkToken { get; set; }
+    public string VkServiceKey { get; set; }
+    public string VkGroupKey { get; set; }
     public long TelegramChatId { get; set; }
     public string VkGetPostsUrl { get; set; }
     public DateTime StartCheckDate { get; set; }
@@ -24,7 +23,8 @@ public class BotConfiguration
         return new BotConfiguration
         {
             TelegramToken = "undefined",
-            VkToken = "undefined",
+            VkServiceKey = "undefined",
+            VkGroupKey = "undefined",
 
             VkRequestAttributes = 
             [

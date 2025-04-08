@@ -1,20 +1,17 @@
 ﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using HotBike.Telegram.Bot.Objects;
+using HotBike.Telegram.Bot.Interfaces;
+using HotBike.Telegram.Bot.Services.VkResponseObjects;
 
-namespace HotBike.Telegram.Bot
+namespace HotBike.Telegram.Bot.Services
 {
-    public class VkApi : IVkApi
+    public class VkApi(BotConfiguration config) : IVkApi
     {
-        private readonly BotConfiguration config;
-        private string vkToken;
+        private readonly BotConfiguration config = config;
+        private string vkServiceKey = config.VkServiceKey;
+        private string vkGroupKey = config.VkGroupKey;
 
-        public VkApi(BotConfiguration config)
-        {
-            vkToken = config.VkToken;
-            this.config = config;
-        }
         public async Task<List<Post>> CheckLatestVkPosts()
         {
             var posts = await GetLatestVkPosts();
@@ -32,7 +29,7 @@ namespace HotBike.Telegram.Bot
         private async Task<List<Post>> GetLatestVkPosts()
         {
             var client = new HttpClient();
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", vkToken);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", vkServiceKey);
 
             try
             {
@@ -63,7 +60,41 @@ namespace HotBike.Telegram.Bot
             return [];
         }
 
-        private string? GetVkPostsRequestUrl()
+        private async Task<List<Post>> GetLatestVk()
+        {
+            var client = new HttpClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", vkServiceKey);
+
+            try
+            {
+                var countAttributeValue = config.VkRequestAttributes.FirstOrDefault(a => a.Name == "Count")?.Value;
+                Console.WriteLine($"Получение последних {countAttributeValue} постов из ВК");
+
+                HttpResponseMessage response = await client.GetAsync(GetVkPostsRequestUrl());
+                response.EnsureSuccessStatusCode(); // Выбрасывает исключение, если код статуса не успешный
+
+
+                // Читаем ответ как строку
+                string responseBody = await response.Content.ReadAsStringAsync();
+                var responseObject = JsonSerializer.Deserialize<VkResponse>(responseBody, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+
+                if (responseObject is null)
+                    throw new Exception("Не удалось распознать ответ сервера");
+
+                Console.WriteLine($"Получено {responseObject.Response.Items.Count} постов");
+
+                return responseObject.Response.Items;
+            }
+            catch (HttpRequestException e)
+            {
+                Console.WriteLine("\nОшибка при выполнении запроса:");
+                Console.WriteLine(e.Message);
+            }
+
+            return [];
+        }
+
+        private string GetVkPostsRequestUrl()
         {
             var request = new StringBuilder(config.VkGetPostsUrl);
 
