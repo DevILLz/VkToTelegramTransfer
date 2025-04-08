@@ -5,8 +5,13 @@ internal class RequestConstants
     internal record RequestAttribute(string Name, string Atribute, string DefaultValue);
     internal static string BaseDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "/HotBike";
 
-    internal static long TelegramChatId = -1002484373576;
+    //internal static long TelegramChatId = -1002484373576; // main
+    internal static long TelegramChatId = -1002540846422; // test
     internal static string VkGetPostsUrl = "https://api.vk.com/method/wall.get";
+    internal static DateTime StartCheckDate = DateTime.Parse("07.04.25");
+
+    internal static string UrlPartDificultiesVK = "wall-226433411_294";
+    internal static string UrlDificultiesTG = "https://t.me/HotBikeYar/89";
 
     internal static string VkVersionAttribute = "v"; 
     internal static string VkVersionAttributeValue = "5.199"; 

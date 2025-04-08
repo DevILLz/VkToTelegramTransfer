@@ -37,8 +37,6 @@ public class DbContext
                         VkMessageHash = post.Hash,
                         Date = post.Date,
                         Edited = post.Edited,
-                        //Date = DateTimeOffset.FromUnixTimeSeconds(post.Date).DateTime,
-                        //Edited = post.Edited is not null ? DateTimeOffset.FromUnixTimeSeconds(post.Edited.Value).DateTime : null,
                         TelegramMessageId = tgMessageId
                     });
                 }

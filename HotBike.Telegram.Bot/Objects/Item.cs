@@ -13,6 +13,8 @@ public class Post
     public PushSubscription PushSubscription { get; set; }
     public List<Attachment> Attachments { get; set; }
     public long Date { get; set; }
+    public DateTime DateTime => DateTimeOffset.FromUnixTimeSeconds(Date)
+                                        .ToLocalTime().DateTime;
     public long? Edited { get; set; }
     public long FromId { get; set; }
     public int Id { get; set; }

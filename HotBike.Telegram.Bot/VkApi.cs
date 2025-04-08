@@ -13,17 +13,17 @@ namespace HotBike.Telegram.Bot
         {
             vkToken = File.ReadAllText(RequestConstants.BaseDirectory + "/vkToken.txt");
         }
-        public async Task<List<Post>> CheckLatestVkPosts()
+        public async Task<List<Post>> CheckLatestVkPosts(DateTime startCheckDate)
         {
             var posts = await GetLatestVkPosts();
             if (posts == null) return [];
 
             var filtredPosts = posts
-                .Where(p => p.CopyHistory is null); // скипаем все репосты
-                
-            //var lastPost = posts;
+                .Where(p => p.DateTime >= startCheckDate) // скипаем все посты до нужной даты
+                .Where(p => p.CopyHistory is null) // скипаем все репосты
+                ;
 
-            return filtredPosts.ToList();
+            return [.. filtredPosts];
         }
 
         private async Task<List<Post>> GetLatestVkPosts()
