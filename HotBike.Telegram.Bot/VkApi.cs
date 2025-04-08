@@ -5,21 +5,23 @@ using HotBike.Telegram.Bot.Objects;
 
 namespace HotBike.Telegram.Bot
 {
-    public class VkApi
+    public class VkApi : IVkApi
     {
+        private readonly BotConfiguration config;
         private string vkToken;
 
-        public VkApi()
+        public VkApi(BotConfiguration config)
         {
-            vkToken = File.ReadAllText(RequestConstants.BaseDirectory + "/vkToken.txt");
+            vkToken = config.VkToken;
+            this.config = config;
         }
-        public async Task<List<Post>> CheckLatestVkPosts(DateTime startCheckDate)
+        public async Task<List<Post>> CheckLatestVkPosts()
         {
             var posts = await GetLatestVkPosts();
             if (posts == null) return [];
 
             var filtredPosts = posts
-                .Where(p => p.DateTime >= startCheckDate) // скипаем все посты до нужной даты
+                .Where(p => p.DateTime >= config.StartCheckDate) // скипаем все посты до нужной даты
                 .Where(p => p.CopyHistory is null) // скипаем все репосты
                 ;
 
@@ -56,12 +58,12 @@ namespace HotBike.Telegram.Bot
 
         private string? GetVkPostsRequestUrl()
         {
-            var request = new StringBuilder(RequestConstants.VkGetPostsUrl);
+            var request = new StringBuilder(config.VkGetPostsUrl);
 
-            if (RequestConstants.VkRequestAttributes.Length > 0)
+            if (config.VkRequestAttributes.Count > 0)
                 request.Append('?');
 
-            foreach (var item in RequestConstants.VkRequestAttributes)
+            foreach (var item in config.VkRequestAttributes)
                 request.Append($"{item.Atribute}={item.DefaultValue}&");
 
             request.Remove(request.Length - 1, 1);

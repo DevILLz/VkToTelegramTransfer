@@ -10,22 +10,33 @@ using Telegram.Bot.Types.ReplyMarkups;
 namespace HotBike.Telegram.Bot;
 public partial class TelegramBot : IDisposable
 {
+    private readonly ITelegramBotClient bot;
+    private readonly IVkApi vkApi;
+    private readonly DbContext context;
+    private readonly BotConfiguration config;
     private string telegramToken;
-    private ITelegramBotClient bot;
-    private VkApi vkApi;
-    private DbContext dbContext;
     private Timer checkTimer;
 
-    public TelegramBot()
+    public bool Initialized { get; private set; }
+
+    public TelegramBot(BotConfiguration config, IVkApi vkApi, DbContext context)
     {
-        telegramToken = File.ReadAllText(RequestConstants.BaseDirectory + "/tgToken.txt");
+        this.config = config;
+        this.vkApi = vkApi;
+        this.context = context;
+        bot = new TelegramBotClient(telegramToken = config.TelegramToken);
     }
 
     public void StartBot()
     {
-        bot = new TelegramBotClient(telegramToken);
-        vkApi = new VkApi();
-        dbContext = new DbContext();
+        if (bot is null)
+            throw new Exception("Telegram bot not configured");
+        if (config is null)
+            throw new Exception("Configuration doesn't exists");
+        if (vkApi is null)
+            throw new Exception("VkApi not configured");
+        if (context is null)
+            throw new Exception("DataBase not configured");
 
         //CheckPostUpdates();
         SetUpTimer();
@@ -34,6 +45,8 @@ public partial class TelegramBot : IDisposable
             HandleError,
             new ReceiverOptions { AllowedUpdates = { } }
         );
+
+        Initialized = true;
     }
 
     private void SetUpTimer()
@@ -57,14 +70,14 @@ public partial class TelegramBot : IDisposable
 
     private async Task CheckPostUpdates()
     {
-        var latestPosts = await vkApi.CheckLatestVkPosts(RequestConstants.StartCheckDate);
+        var latestPosts = await vkApi.CheckLatestVkPosts();
         if (latestPosts is null || latestPosts.Count == 0)
             return;
 
         latestPosts.Reverse(); // в обратном порядке публикуем
         foreach (var post in latestPosts)
         {
-            var messageLink = dbContext.GetMessageLink(post);
+            var messageLink = context.GetMessageLink(post);
             if (messageLink?.VkMessageHash is null || (messageLink.Edited != post.Edited && messageLink.DateTime >= DateTime.Now.AddDays(-7)))
             { // если пост старше недели и он уже был опубликован, то не может быть отредактирован (ограничения ВК)
                 await SendOrUpdatePostToGroup(post, messageLink?.TelegramMessageId);
@@ -88,11 +101,11 @@ public partial class TelegramBot : IDisposable
 
             //TODO: обработать добавление фоток в постах
             if (telegramMessageId is null || telegramMessageId == 0)
-                telegramMessageId = (await bot.SendMessage(new ChatId(RequestConstants.TelegramChatId), vkPost.Text + addiditionalInfo)).Id;
+                telegramMessageId = (await bot.SendMessage(new ChatId(config.TelegramChatId), vkPost.Text + addiditionalInfo)).Id;
             else
-                await bot.EditMessageText(new ChatId(RequestConstants.TelegramChatId), telegramMessageId.Value, vkPost.Text + addiditionalInfo);
+                await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId.Value, vkPost.Text + addiditionalInfo);
 
-            dbContext.AddOrUpdatePostInDb(vkPost, telegramMessageId.Value);
+            context.AddOrUpdatePostInDb(vkPost, telegramMessageId.Value);
             return;
         }
 
@@ -100,8 +113,8 @@ public partial class TelegramBot : IDisposable
         string pattern = @"\[(https?:\/\/[^\|\]]+)\|([^\]]+)\]";
         string resultText = Regex.Replace(vkPost.Text, pattern, m =>
         {
-            string url = m.Groups[1].Value.Contains(RequestConstants.UrlPartDificultiesVK) 
-            ? RequestConstants.UrlDificultiesTG 
+            string url = m.Groups[1].Value.Contains(config.UrlPartDificultiesVK) 
+            ? config.UrlDificultiesTG 
             : m.Groups[1].Value;
 
             string text = m.Groups[2].Value;
@@ -110,21 +123,21 @@ public partial class TelegramBot : IDisposable
         });
 
         if (telegramMessageId is null || telegramMessageId == 0)
-            telegramMessageId = (await bot.SendPhoto(new ChatId(RequestConstants.TelegramChatId), photo, resultText + addiditionalInfo, ParseMode.Html)).Id;
+            telegramMessageId = (await bot.SendPhoto(new ChatId(config.TelegramChatId), photo, resultText + addiditionalInfo, ParseMode.Html)).Id;
         else
         {
             if (photo is not null)
             {
-                await bot.EditMessageCaption(new ChatId(RequestConstants.TelegramChatId), telegramMessageId.Value, vkPost.Text + addiditionalInfo);
+                await bot.EditMessageCaption(new ChatId(config.TelegramChatId), telegramMessageId.Value, vkPost.Text + addiditionalInfo);
 
                 // Потенциальная ошибка
-                await bot.EditMessageMedia(new ChatId(RequestConstants.TelegramChatId), telegramMessageId.Value, new InputMediaPhoto(photo));
+                await bot.EditMessageMedia(new ChatId(config.TelegramChatId), telegramMessageId.Value, new InputMediaPhoto(photo));
             }
             else
-                await bot.EditMessageText(new ChatId(RequestConstants.TelegramChatId), telegramMessageId.Value, vkPost.Text + addiditionalInfo);
+                await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId.Value, vkPost.Text + addiditionalInfo);
         }
         
-        dbContext.AddOrUpdatePostInDb(vkPost, telegramMessageId.Value);
+        context.AddOrUpdatePostInDb(vkPost, telegramMessageId.Value);
     }
 
     private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)

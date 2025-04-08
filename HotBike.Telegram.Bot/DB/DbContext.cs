@@ -5,13 +5,7 @@ namespace HotBike.Telegram.Bot;
 
 public class DbContext
 {
-    private string fullDbPath = RequestConstants.BaseDirectory + "/HotBikeBot.db";
-    public DbContext()
-    {
-        if (!Directory.Exists(RequestConstants.BaseDirectory))
-            Directory.CreateDirectory(RequestConstants.BaseDirectory);
-    }
-
+    private string fullDbPath = BotConfiguration.BaseDirectory + "/HotBikeBot.db";
     public void AddOrUpdatePostInDb(Post post, int tgMessageId)
     {
         try
@@ -47,17 +41,10 @@ public class DbContext
             Console.WriteLine(e.Message);
             throw;
         }
-
     }
 
     public VkToTgMessage GetMessageLink(Post post)
     {
-
-        var fullDbPath = RequestConstants.BaseDirectory + "/HotBikeBot.db";
-
-        if (!Directory.Exists(RequestConstants.BaseDirectory))
-            Directory.CreateDirectory(RequestConstants.BaseDirectory);
-
         try
         {
             using (var db = new LiteDatabase(fullDbPath))
