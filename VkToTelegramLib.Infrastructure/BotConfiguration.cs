@@ -13,6 +13,7 @@ public class BotConfiguration
     public string TelegrasmLink { get; set; }
     public string VkLink { get; set; }
     public DateTime StartCheckDate { get; set; }
+    public int PostCheckInterval { get; set; } // в минутах
 
     // specific for this bot
     public string UrlPartDificultiesVK { get; set; }
@@ -43,6 +44,7 @@ public class BotConfiguration
             UrlDificultiesTG = "undefined",
             TelegrasmLink = "undefined",
             VkLink = "undefined",
+            PostCheckInterval = 30,
         };
     }
     public static BotConfiguration GetOrCreateConfig()

@@ -56,17 +56,20 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
 
         // что бы таймер срабатывал в нужное время (12:00 - 12:30 - 13:00...)
         // нужно его запустить в один из этих промежутков времени
+        var interval = config.PostCheckInterval;
 
-        var minutes = now.Minute < 30 ? 30 : 60;
+        var startTimerTime = ((now.Minute / interval) + 1) * interval;
+        if (startTimerTime > 60) 
+            startTimerTime = 60;
 
         var nextTrigger = new DateTime(
             now.Year, now.Month, now.Day,
             now.Hour, 0, 0
-        ).AddMinutes(minutes);
+        ).AddMinutes(startTimerTime);
 
-        var interval = (long)(nextTrigger - now).TotalMilliseconds;
+        var startDelay = (long)(nextTrigger - now).TotalMilliseconds;
 
-        checkTimer = new Timer(o => Task.Run(CheckPostUpdates), null, interval, 1000 * 60 * 30);
+        checkTimer = new Timer(o => Task.Run(CheckPostUpdates), null, startDelay, 1000 * 60 * interval);
     }
 
     private async Task CheckPostUpdates()
