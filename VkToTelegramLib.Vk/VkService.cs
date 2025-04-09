@@ -1,15 +1,17 @@
 ﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using VkToTelegramLib.Infrastructure;
 using VkToTelegramLib.Infrastructure.Interfaces;
 using VkToTelegramLib.Infrastructure.VkResponseObjects;
 
 namespace VkToTelegramLib.Vk;
 
-public class VkService(BotConfiguration config) : IVkService
+public class VkService(BotConfiguration config, ILogger<VkService> logger) : IVkService
 {
     private readonly BotConfiguration config = config;
+    private readonly ILogger<VkService> logger = logger;
     private string vkServiceKey = config.VkServiceKey;
     private string vkGroupKey = config.VkGroupKey;
 
@@ -23,7 +25,7 @@ public class VkService(BotConfiguration config) : IVkService
             .Where(p => p.CopyHistory is null) // скипаем все репосты
             .ToList();
 
-        Console.WriteLine($"Постов после фильтрации по дате и исключения репостов: {filtredPosts.Count}");
+        logger.LogInformation($"Постов после фильтрации по дате и исключения репостов: {filtredPosts.Count}");
         return filtredPosts;
     }
 
@@ -35,7 +37,7 @@ public class VkService(BotConfiguration config) : IVkService
         try
         {
             var countAttributeValue = config.VkRequestAttributes.FirstOrDefault(a => a.Name == "Count")?.Value;
-            Console.WriteLine($"Получение последних {countAttributeValue} постов из ВК");
+            logger.LogInformation($"Получение последних {countAttributeValue} постов из ВК");
 
             var response = await client.GetAsync(GetVkPostsRequestUrl());
             response.EnsureSuccessStatusCode(); // Выбрасывает исключение, если код статуса не успешный
@@ -47,14 +49,14 @@ public class VkService(BotConfiguration config) : IVkService
             if (responseObject is null)
                 throw new Exception("Не удалось распознать ответ сервера");
 
-            Console.WriteLine($"Получено {responseObject.Response.Items.Count} постов");
+            logger.LogInformation($"Получено {responseObject.Response.Items.Count} постов");
 
             return responseObject.Response.Items;
         }
         catch (HttpRequestException e)
         {
-            Console.WriteLine("\nОшибка при выполнении запроса:");
-            Console.WriteLine(e.Message);
+            logger.LogInformation("\nОшибка при выполнении запроса:");
+            logger.LogInformation(e.Message);
         }
 
         return [];
@@ -68,7 +70,7 @@ public class VkService(BotConfiguration config) : IVkService
         //try
         //{
         //    var countAttributeValue = config.VkRequestAttributes.FirstOrDefault(a => a.Name == "Count")?.Value;
-        //    Console.WriteLine($"Получение последних {countAttributeValue} постов из ВК");
+        //    logger.LogInformation($"Получение последних {countAttributeValue} постов из ВК");
 
         //    HttpResponseMessage response = await client.GetAsync(GetVkPostsRequestUrl());
         //    response.EnsureSuccessStatusCode(); // Выбрасывает исключение, если код статуса не успешный
@@ -80,14 +82,14 @@ public class VkService(BotConfiguration config) : IVkService
         //    if (responseObject is null)
         //        throw new Exception("Не удалось распознать ответ сервера");
 
-        //    Console.WriteLine($"Получено {responseObject.Response.Items.Count} постов");
+        //    logger.LogInformation($"Получено {responseObject.Response.Items.Count} постов");
 
         //    return responseObject.Response.Items;
         //}
         //catch (HttpRequestException e)
         //{
-        //    Console.WriteLine("\nОшибка при выполнении запроса:");
-        //    Console.WriteLine(e.Message);
+        //    logger.LogInformation("\nОшибка при выполнении запроса:");
+        //    logger.LogInformation(e.Message);
         //}
 
         await Task.Delay(0);

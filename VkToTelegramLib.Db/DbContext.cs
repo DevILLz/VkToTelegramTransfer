@@ -2,15 +2,17 @@
 using VkToTelegramLib.Infrastructure;
 using VkToTelegramLib.Infrastructure.Interfaces;
 using VkToTelegramLib.Infrastructure.VkResponseObjects;
+using Microsoft.Extensions.Logging;
 
 namespace VkToTelegramLib.Db;
 
-public class DbContext : IDbContext
+public class DbContext(ILogger<DbContext> logger) : IDbContext
 {
-    private string fullDbPath = BotConfiguration.BaseDirectory + "/VkToTeleramBot.db";
+    private readonly ILogger<DbContext> logger = logger;
+    private string fullDbPath = BotConfiguration.BaseDirectory + "\\VkToTeleramBot.db";
     public void AddOrUpdatePostInDb(Post post, int tgMessageId)
     {
-        Console.WriteLine("Публикация в телеграмме прошла успешно, отправляем в БД");
+        logger.LogInformation("Публикация в телеграмме прошла успешно, отправляем в БД");
         try
         {
             using (var db = new LiteDatabase(fullDbPath))
@@ -39,11 +41,11 @@ public class DbContext : IDbContext
                 }
             }
 
-            Console.WriteLine("Бд обновлена");
+            logger.LogInformation("Бд обновлена");
         }
         catch (Exception e)
         {
-            Console.WriteLine("Ошибка при обновлении БД: ", e.Message);
+            logger.LogInformation("Ошибка при обновлении БД: ", e.Message);
         }
     }
 
@@ -59,7 +61,7 @@ public class DbContext : IDbContext
         }
         catch (Exception e)
         {
-            Console.WriteLine(e.Message);
+            logger.LogInformation(e.Message);
             return new VkToTgMessage();
         }
     }
@@ -76,7 +78,7 @@ public class DbContext : IDbContext
         }
         catch (Exception e)
         {
-            Console.WriteLine(e.Message);
+            logger.LogInformation(e.Message);
         }
     }
 }

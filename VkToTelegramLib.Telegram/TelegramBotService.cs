@@ -1,4 +1,5 @@
 ﻿using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
@@ -9,26 +10,21 @@ using VkToTelegramLib.Infrastructure.Interfaces;
 using VkToTelegramLib.Infrastructure.VkResponseObjects;
 
 namespace VkToTelegramLib.Telegram;
-public partial class TelegramBotService(BotConfiguration config, IVkService vkApi, IDbContext context) : IDisposable
+public partial class TelegramBotService(BotConfiguration config, IVkService vkApi, IDbContext context, ILogger<TelegramBotService> logger) : IDisposable
 {
-    private ITelegramBotClient bot;
     private readonly IVkService vkApi = vkApi;
     private readonly IDbContext context = context;
+    private readonly ILogger<TelegramBotService> logger = logger;
     private readonly BotConfiguration config = config;
+    private ITelegramBotClient bot;
     private Timer checkTimer;
 
     public bool Initialized { get; private set; }
 
     public void StartBot(CancellationToken cancellationToken = default)
     {
-        try
-        {
-            bot = new TelegramBotClient(config.TelegramToken);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex);
-        }
+        bot = new TelegramBotClient(config.TelegramToken);
+
         if (bot is null)
             throw new Exception("Telegram bot not configured");
         if (config is null)
@@ -38,7 +34,6 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
         if (context is null)
             throw new Exception("DataBase not configured");
 
-        //CheckPostUpdates();
         SetUpTimer();
         bot.StartReceiving(
             HandleUpdateAsync,
@@ -81,11 +76,11 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
         latestPosts.Reverse(); // в обратном порядке публикуем
         foreach (var post in latestPosts)
         {
-            Console.WriteLine($"Проверка поста {post.Id}. Текст: {post.Text.Take(30)}...");
+            logger.LogInformation($"Проверка поста {post.Id}. Текст: {post.Text.Take(30)}...");
             var messageLink = context.GetMessageLink(post) ?? throw new Exception("Ошибка при запросе MessageLink");
 
             if (messageLink?.VkMessageHash is null)
-                Console.WriteLine($"Данный пост еще не был опубликован");
+                logger.LogInformation($"Данный пост еще не был опубликован");
 
             //context.DebugRequest();
             if (messageLink?.VkMessageHash is null) // добавление нового поста
@@ -110,7 +105,7 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
         var telegramMessageId = 0;
         if (photo is null || vkPost.Text.Length > 1024) // если под фото больше 1024 символов, то такой пост не сделать в телеге из за ограничений, убираем фото
         {
-            Console.WriteLine($"В данном посте либо нет фотографии, либо текст слишком длинный для подобного поста, публикуем как текст");
+            logger.LogInformation($"В данном посте либо нет фотографии, либо текст слишком длинный для подобного поста, публикуем как текст");
 
             if (vkPost.Text.Length > 4096)
                 return; // TODO: разделять на несколько постов
@@ -135,21 +130,21 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
 
         if (photo is null || vkPost.Text.Length > 1024) // если под фото больше 1024 символов, то такой пост не сделать в телеге из за ограничений, убираем фото
         {
-            Console.WriteLine($"В данном посте либо нет фотографии, либо текст слишком длинный для подобного поста, публикуем как текст");
+            logger.LogInformation($"В данном посте либо нет фотографии, либо текст слишком длинный для подобного поста, публикуем как текст");
 
             if (vkPost.Text.Length > 4096)
                 return; // TODO: разделять на несколько постов
                         // или в комментарии добавлять остаток текста
 
-            Console.WriteLine($"Посты уже был опубликован, пытаемся обновить...");
+            logger.LogInformation($"Посты уже был опубликован, пытаемся обновить...");
             await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId, telegramText, ParseMode.Html);
-            Console.WriteLine($"Пост обновлен");
+            logger.LogInformation($"Пост обновлен");
 
             context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
             return;
         }
 
-        Console.WriteLine($"Посты уже был опубликован, пытаемся обновить...");
+        logger.LogInformation($"Посты уже был опубликован, пытаемся обновить...");
         if (photo is not null)
         {
             // Потенциальная ошибка
@@ -167,7 +162,7 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
         }
         else
             await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId, telegramText);
-        Console.WriteLine($"Пост обновлен");
+        logger.LogInformation($"Пост обновлен");
 
         context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
     }
@@ -175,7 +170,7 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
     private string UpdateMessageForTelegramPost(Post vkPost)
     {
         var addiditionalInfo = $"\n\n<a href=\"{config.VkLink}\">Группа ВК</a>\n"
-            + "#ГорячиеВеломаны";
+            + config.HashTegs;
 
         var pattern = @"\[(https?:\/\/[^\|\]]+)\|([^\]]+)\]";
 
@@ -199,14 +194,14 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
         switch (update.Type)
         {
             case UpdateType.Message:
-                Console.WriteLine($"Получено сообщение от {update.Message!.Chat}: {update.Message!.Text}");
+                logger.LogInformation($"Получено сообщение от {update.Message!.Chat}: {update.Message!.Text}");
                 await OnMessage(botClient, update.Message, cancellationToken);
                 break;
             case UpdateType.MyChatMember:
                 if (update.MyChatMember is null)
                     break;
 
-                Console.WriteLine($"Какие-то действия с чатом {update.MyChatMember.Chat} : {update.MyChatMember.Chat.Id}");
+                logger.LogInformation($"Какие-то действия с чатом {update.MyChatMember.Chat} : {update.MyChatMember.Chat.Id}");
                 break;
             case UpdateType.Unknown:
                 break;
@@ -304,7 +299,7 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
     {
         // Некоторые действия
         await Task.Delay(0, cancellationToken);
-        Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(exception));
+        logger.LogInformation(Newtonsoft.Json.JsonConvert.SerializeObject(exception));
     }
 
     public void Dispose()

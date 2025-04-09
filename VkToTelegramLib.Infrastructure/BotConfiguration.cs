@@ -14,6 +14,7 @@ public class BotConfiguration
     public string VkLink { get; set; }
     public DateTime StartCheckDate { get; set; }
     public int PostCheckInterval { get; set; } // в минутах
+    public string HashTegs { get; set; }
 
     // specific for this bot
     public string UrlPartDificultiesVK { get; set; }
@@ -45,6 +46,7 @@ public class BotConfiguration
             TelegrasmLink = "undefined",
             VkLink = "undefined",
             PostCheckInterval = 30,
+            HashTegs = string.Empty,
         };
     }
     public static BotConfiguration GetOrCreateConfig()
