@@ -11,7 +11,7 @@ using VkToTelegramLib.Infrastructure.VkResponseObjects;
 namespace VkToTelegramLib.Telegram;
 public partial class TelegramBotService(BotConfiguration config, IVkService vkApi, IDbContext context) : IDisposable
 {
-    private readonly ITelegramBotClient bot = new TelegramBotClient(config.TelegramToken);
+    private ITelegramBotClient bot;
     private readonly IVkService vkApi = vkApi;
     private readonly IDbContext context = context;
     private readonly BotConfiguration config = config;
@@ -21,6 +21,14 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
 
     public void StartBot(CancellationToken cancellationToken = default)
     {
+        try
+        {
+            bot = new TelegramBotClient(config.TelegramToken);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
         if (bot is null)
             throw new Exception("Telegram bot not configured");
         if (config is null)
@@ -71,27 +79,33 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
         foreach (var post in latestPosts)
         {
             Console.WriteLine($"Проверка поста {post.Id}. Текст: {post.Text.Take(30)}...");
-            var messageLink = context.GetMessageLink(post);
+            var messageLink = context.GetMessageLink(post) ?? throw new Exception("Ошибка при запросе MessageLink");
 
             if (messageLink?.VkMessageHash is null)
                 Console.WriteLine($"Данный пост еще не был опубликован");
 
-            if (messageLink?.VkMessageHash is null || messageLink.Edited != post.Edited && messageLink.DateTime >= DateTime.Now.AddDays(-7))
+            //context.DebugRequest();
+            if (messageLink?.VkMessageHash is null) // добавление нового поста
+            {
+                await SendPostToGroup(post);
+                continue;
+            }
+
+            if (messageLink.Edited != post.Edited && messageLink.DateTime >= DateTime.Now.AddDays(-7)) // обновление поста
             { // если пост старше недели и он уже был опубликован, то не может быть отредактирован (ограничения ВК)
-                await SendOrUpdatePostToGroup(post, messageLink?.TelegramMessageId);
+                await UpdatePostToGroup(post, messageLink.TelegramMessageId);
                 continue;
             }
         }
     }
 
-    private async Task SendOrUpdatePostToGroup(Post vkPost, int? telegramMessageId = null)
+    private async Task SendPostToGroup(Post vkPost)
     {
         var photo = vkPost.Attachments.FirstOrDefault(a => a.Type == "photo")?.Photo.OrigPhoto.Url;
-        var vkGroupLink = "https://vk.com/goryachievelomany";
-        var addiditionalInfo = $"\n\n<a href=\"{vkGroupLink}\">Группа ВК</a>\n"
-            + "#ГорячиеВеломаны";
+        var telegramText = UpdateMessageForTelegramPost(vkPost);
 
-        if (photo is null || vkPost.Text.Length > 1024)
+        var telegramMessageId = 0;
+        if (photo is null || vkPost.Text.Length > 1024) // если под фото больше 1024 символов, то такой пост не сделать в телеге из за ограничений, убираем фото
         {
             Console.WriteLine($"В данном посте либо нет фотографии, либо текст слишком длинный для подобного поста, публикуем как текст");
 
@@ -100,54 +114,81 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
             // или в комментарии добавлять остаток текста
 
             //TODO: обработать добавление фоток в постах
-            if (telegramMessageId is null || telegramMessageId == 0)
-                telegramMessageId = (await bot.SendMessage(new ChatId(config.TelegramChatId), vkPost.Text + addiditionalInfo)).Id;
-            else
-            {
-                Console.WriteLine($"Посты уже был опубликован, пытаемся обновить...");
-                await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId.Value, vkPost.Text + addiditionalInfo);
-                Console.WriteLine($"Пост обновлен");
-            }
+            telegramMessageId = (await bot.SendMessage(new ChatId(config.TelegramChatId), telegramText, ParseMode.Html)).Id;
 
-            
-            context.AddOrUpdatePostInDb(vkPost, telegramMessageId.Value);
+            context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
             return;
         }
 
-        //TODO: замена ссылок на пост с уровнями сложности        
-        string pattern = @"\[(https?:\/\/[^\|\]]+)\|([^\]]+)\]";
-        string resultText = Regex.Replace(vkPost.Text, pattern, m =>
+        telegramMessageId = (await bot.SendPhoto(new ChatId(config.TelegramChatId), photo, telegramText, ParseMode.Html)).Id;
+
+        context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
+    }
+
+    private async Task UpdatePostToGroup(Post vkPost, int telegramMessageId)
+    {
+        var photo = vkPost.Attachments.FirstOrDefault(a => a.Type == "photo")?.Photo.OrigPhoto.Url;
+        var telegramText = UpdateMessageForTelegramPost(vkPost);
+
+        if (photo is null || vkPost.Text.Length > 1024) // если под фото больше 1024 символов, то такой пост не сделать в телеге из за ограничений, убираем фото
         {
-            string url = m.Groups[1].Value;
+            Console.WriteLine($"В данном посте либо нет фотографии, либо текст слишком длинный для подобного поста, публикуем как текст");
+
+            if (vkPost.Text.Length > 4096)
+                return; // TODO: разделять на несколько постов
+                        // или в комментарии добавлять остаток текста
+
+            Console.WriteLine($"Посты уже был опубликован, пытаемся обновить...");
+            await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId, telegramText, ParseMode.Html);
+            Console.WriteLine($"Пост обновлен");
+
+            context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
+            return;
+        }
+
+        Console.WriteLine($"Посты уже был опубликован, пытаемся обновить...");
+        if (photo is not null)
+        {
+            // Потенциальная ошибка
+            try
+            { // если попытаться обновить фото в посте, где изменился только текст, то этот запрос выкинет исключение
+              // и, почему-то, при обновлении картинки, стирается весь текст =(
+                await bot.EditMessageMedia(new ChatId(config.TelegramChatId), telegramMessageId, new InputMediaPhoto(photo));
+            }
+            catch { }
+            try
+            { // по этому текст обновляем принудительно всегда в таких постах
+                await bot.EditMessageCaption(new ChatId(config.TelegramChatId), telegramMessageId, telegramText, ParseMode.Html);
+            }
+            catch { }
+        }
+        else
+            await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId, telegramText);
+        Console.WriteLine($"Пост обновлен");
+
+        context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
+    }
+
+    private string UpdateMessageForTelegramPost(Post vkPost)
+    {
+        var addiditionalInfo = $"\n\n<a href=\"{config.VkLink}\">Группа ВК</a>\n"
+            + "#ГорячиеВеломаны";
+
+        var pattern = @"\[(https?:\/\/[^\|\]]+)\|([^\]]+)\]";
+
+        return Regex.Replace(vkPost.Text, pattern, m =>
+        {
+            var url = m.Groups[1].Value;
 
             if (config.UrlPartDificultiesVK != "undefined" && config.UrlDificultiesTG != "undefined")
                 url = m.Groups[1].Value.Contains(config.UrlPartDificultiesVK)
                     ? config.UrlDificultiesTG
                     : m.Groups[1].Value;
 
-            string text = m.Groups[2].Value;
-            
+            var text = m.Groups[2].Value;
+
             return $"<a href=\"{url}\">{text}</a>";
-        });
-
-        if (telegramMessageId is null || telegramMessageId == 0)
-            telegramMessageId = (await bot.SendPhoto(new ChatId(config.TelegramChatId), photo, resultText + addiditionalInfo, ParseMode.Html)).Id;
-        else
-        {
-            Console.WriteLine($"Посты уже был опубликован, пытаемся обновить...");
-            if (photo is not null)
-            {
-                await bot.EditMessageCaption(new ChatId(config.TelegramChatId), telegramMessageId.Value, vkPost.Text + addiditionalInfo);
-
-                // Потенциальная ошибка
-                await bot.EditMessageMedia(new ChatId(config.TelegramChatId), telegramMessageId.Value, new InputMediaPhoto(photo));
-            }
-            else
-                await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId.Value, vkPost.Text + addiditionalInfo);
-            Console.WriteLine($"Пост обновлен");
-        }
-        
-        context.AddOrUpdatePostInDb(vkPost, telegramMessageId.Value);
+        }) + addiditionalInfo;
     }
 
     private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
@@ -224,8 +265,8 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
 
         var inMessageButtons = new InlineKeyboardMarkup(
                 [[
-                    InlineKeyboardButton.WithUrl("Сообщество телеграм", "https://t.me/HotBikeYar"),
-                    InlineKeyboardButton.WithUrl("Сообщество ВК", "https://vk.com/goryachievelomany"),
+                    InlineKeyboardButton.WithUrl("Сообщество телеграм", config.TelegrasmLink),
+                    InlineKeyboardButton.WithUrl("Сообщество ВК", config.VkLink),
                 ],
             ]);
 
@@ -239,7 +280,8 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
             ResizeKeyboard = true,
         };
 
-        if (string.Compare(message.Text, textCommands[0], true) == 0)
+        var culture = StringComparison.InvariantCultureIgnoreCase;
+        if (message.Text.Contains(textCommands[0], culture))
         {
             var responseMessage = "Вы можете давать команды боту с помочью кнопок под клавиатурой \nКоманды бота: ";
             foreach (var command in textCommands)
@@ -248,7 +290,7 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
             await botClient.SendMessage(message.Chat, responseMessage, cancellationToken: cancellationToken, replyMarkup: inKeyboardButtons);
         }
 
-        if (string.Compare(message.Text, textCommands[1], true) == 0 || string.Compare(message.Text, keyboard[0].Text, true) == 0)
+        if (message.Text.Contains(textCommands[1], culture) || message.Text.Contains(keyboard[0].Text, culture))
         {
             await CheckPostUpdates();
             await botClient.SendMessage(message.Chat, "Проверка обновлений завершена", cancellationToken: cancellationToken, replyMarkup: inMessageButtons);

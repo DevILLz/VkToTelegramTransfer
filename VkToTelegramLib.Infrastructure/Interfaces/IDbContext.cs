@@ -1,10 +1,10 @@
 ﻿using VkToTelegramLib.Infrastructure.VkResponseObjects;
 
-namespace VkToTelegramLib.Infrastructure.Interfaces
+namespace VkToTelegramLib.Infrastructure.Interfaces;
+
+public interface IDbContext
 {
-    public interface IDbContext
-    {
-        void AddOrUpdatePostInDb(Post post, int tgMessageId);
-        VkToTgMessage GetMessageLink(Post post);
-    }
+    void AddOrUpdatePostInDb(Post post, int tgMessageId);
+    VkToTgMessage GetMessageLink(Post post);
+    void DebugRequest();
 }

@@ -10,6 +10,8 @@ public class BotConfiguration
     public string VkGroupKey { get; set; }
     public long TelegramChatId { get; set; }
     public string VkGetPostsUrl { get; set; }
+    public string TelegrasmLink { get; set; }
+    public string VkLink { get; set; }
     public DateTime StartCheckDate { get; set; }
 
     // specific for this bot
@@ -26,7 +28,7 @@ public class BotConfiguration
             VkServiceKey = "undefined",
             VkGroupKey = "undefined",
 
-            VkRequestAttributes = 
+            VkRequestAttributes =
             [
                 new VkRequestAttribute("Version", "v", "5.199"),
                 new VkRequestAttribute("Filter", "filter", "owner"),
@@ -39,6 +41,8 @@ public class BotConfiguration
             TelegramChatId = 0,
             UrlPartDificultiesVK = "undefined",
             UrlDificultiesTG = "undefined",
+            TelegrasmLink = "undefined",
+            VkLink = "undefined",
         };
     }
     public static BotConfiguration GetOrCreateConfig()

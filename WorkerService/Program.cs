@@ -1,6 +1,6 @@
 using WorkerService;
 
-IHost host = Host.CreateDefaultBuilder(args)
+var host = Host.CreateDefaultBuilder(args)
     .UseWindowsService() // <--- ключевая строка
     .ConfigureServices(services =>
     {
@@ -9,3 +9,6 @@ IHost host = Host.CreateDefaultBuilder(args)
     .Build();
 
 host.Run();
+
+//https://github.com/TelegramBots/Telegram.Bot
+//https://dev.vk.com/ru/method/wall

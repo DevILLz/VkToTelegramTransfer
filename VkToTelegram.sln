@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.13.35919.96
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Console", "Console\Console.csproj", "{7330FA4B-71CC-477F-B900-7D4910E581B0}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VkToTelegramLib.Telegram", "VkToTelegramLib.Telegram\VkToTelegramLib.Telegram.csproj", "{D3C9CA5A-9FE4-42D6-B2DB-DA422FA6DFF1}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VkToTelegramLib.Db", "VkToTelegramLib.Db\VkToTelegramLib.Db.csproj", "{89CDE942-8217-4BF3-AF2B-FA27921BC2AE}"
@@ -25,10 +23,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{7330FA4B-71CC-477F-B900-7D4910E581B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7330FA4B-71CC-477F-B900-7D4910E581B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7330FA4B-71CC-477F-B900-7D4910E581B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7330FA4B-71CC-477F-B900-7D4910E581B0}.Release|Any CPU.Build.0 = Release|Any CPU
 		{D3C9CA5A-9FE4-42D6-B2DB-DA422FA6DFF1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{D3C9CA5A-9FE4-42D6-B2DB-DA422FA6DFF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D3C9CA5A-9FE4-42D6-B2DB-DA422FA6DFF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -54,7 +48,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{7330FA4B-71CC-477F-B900-7D4910E581B0} = {2BABF6D9-DF80-42CB-81C0-E0A2682B4060}
 		{D3C9CA5A-9FE4-42D6-B2DB-DA422FA6DFF1} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{89CDE942-8217-4BF3-AF2B-FA27921BC2AE} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{EF8128D1-AA7E-43A2-8075-C7030D3B446E} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}

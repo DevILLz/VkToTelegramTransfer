@@ -4,49 +4,48 @@ using VkToTelegramLib.Infrastructure.Interfaces;
 using VkToTelegramLib.Telegram;
 using VkToTelegramLib.Vk;
 
-namespace WorkerService
+namespace WorkerService;
+
+public class Worker : BackgroundService
 {
-    public class Worker : BackgroundService
+    private readonly ILogger<Worker> _logger;
+    private TelegramBotService bot;
+    public Worker(ILogger<Worker> logger)
     {
-        private readonly ILogger<Worker> _logger;
-        private TelegramBotService bot;
-        public Worker(ILogger<Worker> logger)
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    {
+        if (_logger.IsEnabled(LogLevel.Information))
         {
-            _logger = logger;
+            _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
         }
 
-        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        // Типа DI контейнер =)
+        try
         {
-            if (_logger.IsEnabled(LogLevel.Information))
-            {
-                _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
-            }
+            var config = BotConfiguration.GetOrCreateConfig();
+            IVkService vkApi = new VkService(config);
+            IDbContext dbContext = new DbContext();
 
-            // Типа DI контейнер =)
-            try
-            {
-                var config = BotConfiguration.GetOrCreateConfig();
-                IVkService vkApi = new VkService(config);
-                IDbContext dbContext = new DbContext();
-
-                bot = new TelegramBotService(config, vkApi, dbContext);
-                await Task.Run(() => bot.StartBot(cancellationToken), cancellationToken);
-            }
-            catch (Exception)
-            {
-                Console.WriteLine($"Возникли проблемы при запуске бота... \n" +
-                    $"Проверьте конфигурационный файл: \n {BotConfiguration.BaseDirectory}\\{BotConfiguration.ConfigFileName}\n" +
-                    $"");
-            }
-
-            if (bot?.Initialized ?? false)
-                Console.WriteLine("Бот запущен успешно");
+            bot = new TelegramBotService(config, vkApi, dbContext);
+            await Task.Run(() => bot.StartBot(cancellationToken), cancellationToken);
         }
-        public override async Task StopAsync(CancellationToken cancellationToken)
+        catch (Exception)
         {
-            Console.WriteLine("Service is stopping...");
-            await base.StopAsync(cancellationToken);
-            bot?.Dispose();
+            Console.WriteLine($"Возникли проблемы при запуске бота... \n" +
+                $"Проверьте конфигурационный файл: \n {BotConfiguration.BaseDirectory}\\{BotConfiguration.ConfigFileName}\n" +
+                $"");
         }
+
+        if (bot?.Initialized ?? false)
+            Console.WriteLine("Бот запущен успешно");
+    }
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        Console.WriteLine("Service is stopping...");
+        await base.StopAsync(cancellationToken);
+        bot?.Dispose();
     }
 }
