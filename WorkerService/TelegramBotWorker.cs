@@ -10,6 +10,7 @@ public class TelegramBotWorker(TelegramBotService bot, ILogger<TelegramBotWorker
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        await Task.Delay(0);
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation($"Worker running at: {DateTimeOffset.Now}");
 

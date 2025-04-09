@@ -55,8 +55,7 @@ public class VkService(BotConfiguration config, ILogger<VkService> logger) : IVk
         }
         catch (HttpRequestException e)
         {
-            logger.LogInformation("\nОшибка при выполнении запроса:");
-            logger.LogInformation(e.Message);
+            logger.LogError("Ошибка при выполнении запроса: ", [.. e.Message]);
         }
 
         return [];
@@ -88,8 +87,7 @@ public class VkService(BotConfiguration config, ILogger<VkService> logger) : IVk
         //}
         //catch (HttpRequestException e)
         //{
-        //    logger.LogInformation("\nОшибка при выполнении запроса:");
-        //    logger.LogInformation(e.Message);
+        //   logger.LogError("Ошибка при выполнении запроса: ", e.Message);
         //}
 
         await Task.Delay(0);

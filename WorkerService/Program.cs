@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Serilog;
 using VkToTelegramLib.Db;
 using VkToTelegramLib.Infrastructure;
@@ -7,11 +9,11 @@ using VkToTelegramLib.Vk;
 using WorkerService;
 
 Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
     .WriteTo.File(BotConfiguration.BaseDirectory + "\\log.txt", rollingInterval: RollingInterval.Day) // лог по дням
     .CreateLogger();
 
 var host = Host.CreateDefaultBuilder(args)
-    .UseWindowsService() // <--- ключевая строка
     .UseSerilog()
     .ConfigureServices(services =>
     {
@@ -24,11 +26,18 @@ var host = Host.CreateDefaultBuilder(args)
     .ConfigureLogging(logging =>
     {
         logging.AddConsole();
+#pragma warning disable CA1416 // Validate platform compatibility
         logging.AddEventLog(s => s.Filter = (f, b) => b >= LogLevel.Warning);    // Добавим вывод в журнал Windows (если надо)
-    })
-    .Build();
+#pragma warning restore CA1416 // Validate platform compatibility
+    });
 
-host.Run();
+bool isService = !(Debugger.IsAttached || args.Contains("--console"));
+if (isService && RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+{
+    host = host.UseWindowsService();
+}
+
+host.Build().Run();
 
 //https://github.com/TelegramBots/Telegram.Bot
 //https://dev.vk.com/ru/method/wall

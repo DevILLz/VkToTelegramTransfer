@@ -45,7 +45,7 @@ public class DbContext(ILogger<DbContext> logger) : IDbContext
         }
         catch (Exception e)
         {
-            logger.LogInformation("Ошибка при обновлении БД: ", e.Message);
+            logger.LogError("Ошибка при обновлении БД: ", [.. e.Message]);
         }
     }
 
@@ -61,7 +61,7 @@ public class DbContext(ILogger<DbContext> logger) : IDbContext
         }
         catch (Exception e)
         {
-            logger.LogInformation(e.Message);
+            logger.LogError(e.Message);
             return new VkToTgMessage();
         }
     }
@@ -78,7 +78,7 @@ public class DbContext(ILogger<DbContext> logger) : IDbContext
         }
         catch (Exception e)
         {
-            logger.LogInformation(e.Message);
+            logger.LogError(e.Message);
         }
     }
 }

@@ -76,24 +76,25 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
         latestPosts.Reverse(); // в обратном порядке публикуем
         foreach (var post in latestPosts)
         {
-            logger.LogInformation($"Проверка поста {post.Id}. Текст: {post.Text.Take(30)}...");
+            logger.LogInformation($"Проверка поста {post.Id}. Текст: {post.Text.Substring(0, 30)}...");
             var messageLink = context.GetMessageLink(post) ?? throw new Exception("Ошибка при запросе MessageLink");
-
-            if (messageLink?.VkMessageHash is null)
-                logger.LogInformation($"Данный пост еще не был опубликован");
 
             //context.DebugRequest();
             if (messageLink?.VkMessageHash is null) // добавление нового поста
             {
+                logger.LogInformation($"Данный пост еще не был опубликован");
                 await SendPostToGroup(post);
                 continue;
             }
 
             if (messageLink.Edited != post.Edited && messageLink.DateTime >= DateTime.Now.AddDays(-7)) // обновление поста
             { // если пост старше недели и он уже был опубликован, то не может быть отредактирован (ограничения ВК)
+                logger.LogInformation($"Данный пост уже был опубликован, пытаемся обновить");
                 await UpdatePostToGroup(post, messageLink.TelegramMessageId);
                 continue;
             }
+
+            logger.LogInformation($"Создание или обновление поста в телеграмме не требуется");
         }
     }
 
