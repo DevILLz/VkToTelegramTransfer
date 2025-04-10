@@ -40,7 +40,7 @@ UrlDificultiesTG - то, на что будет заменена вся ссыл
 ... прочие параметры говорят сами за себя, и\или не особо важны
 
    .. запуск ..
-   git clone https://github.com/DevILLz/HotBikeTelegramBot.git
+   git clone https://github.com/DevILLz/VkToTelegramTransfer.git
    1. собрать консольный проект и запустить
    2. запуск как сервис:
    dotnet publish -c Release -r win-x64 --self-contained true
