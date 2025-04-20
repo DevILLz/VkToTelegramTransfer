@@ -138,10 +138,20 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
                         // или в комментарии добавлять остаток текста
 
             logger.LogInformation($"Посты уже был опубликован, пытаемся обновить...");
-            await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId, telegramText, ParseMode.Html);
+            try
+            {
+                await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId, telegramText, ParseMode.Html);
+
+                context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                if (ex.Message.Contains("there is no text in the message to edit"))
+                    context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
+            }
             logger.LogInformation($"Пост обновлен");
 
-            context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
             return;
         }
 
