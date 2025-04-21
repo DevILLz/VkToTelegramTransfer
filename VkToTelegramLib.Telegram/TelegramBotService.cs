@@ -12,6 +12,7 @@ using VkToTelegramLib.Infrastructure.VkResponseObjects;
 namespace VkToTelegramLib.Telegram;
 public partial class TelegramBotService(BotConfiguration config, IVkService vkApi, IDbContext context, ILogger<TelegramBotService> logger) : IDisposable
 {
+    private const int maxTelegramMessageLength = 4064;
     private readonly IVkService vkApi = vkApi;
     private readonly IDbContext context = context;
     private readonly ILogger<TelegramBotService> logger = logger;
@@ -100,22 +101,34 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
 
     private async Task SendPostToGroup(Post vkPost)
     {
+        if (vkPost.Text.Length > maxTelegramMessageLength)
+            return; // TODO: разделять на несколько постов
+        // или в комментарии добавлять остаток текста
+        // на текущем моменте телеграмм не поддерживает посты с длинной выше 4064 (примерно)
+        // позже надо бы этим заняться
+        // На текущем этапе тут стоит баг, который будет постоянно проверять длинный пост...
+
         var photo = vkPost.Attachments.FirstOrDefault(a => a.Type == "photo")?.Photo.OrigPhoto.Url;
         var telegramText = UpdateMessageForTelegramPost(vkPost);
 
         var telegramMessageId = 0;
-        if (photo is null || vkPost.Text.Length > 1024) // если под фото больше 1024 символов, то такой пост не сделать в телеге из за ограничений, убираем фото
-        {
-            logger.LogInformation($"В данном посте либо нет фотографии, либо текст слишком длинный для подобного поста, публикуем как текст");
 
-            if (vkPost.Text.Length > 4096)
-                return; // TODO: разделять на несколько постов
-            // или в комментарии добавлять остаток текста
+        if (photo is null)
+        {
+            logger.LogInformation($"В данном посте либо нет фотографии, публикуем как текст");
 
             //TODO: обработать добавление фоток в постах
-            telegramMessageId = (await bot.SendMessage(new ChatId(config.TelegramChatId), telegramText, ParseMode.Html)).Id;
+            try
+            {
+                telegramMessageId = (await bot.SendMessage(new ChatId(config.TelegramChatId), telegramText, ParseMode.Html)).Id;
 
-            context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
+                context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+            }
+           
             return;
         }
 
@@ -126,18 +139,17 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
 
     private async Task UpdatePostToGroup(Post vkPost, int telegramMessageId)
     {
+        if (vkPost.Text.Length > maxTelegramMessageLength)
+            return; // TODO: разделять на несколько постов
+                    // или в комментарии добавлять остаток текста
+
         var photo = vkPost.Attachments.FirstOrDefault(a => a.Type == "photo")?.Photo.OrigPhoto.Url;
         var telegramText = UpdateMessageForTelegramPost(vkPost);
 
-        if (photo is null || vkPost.Text.Length > 1024) // если под фото больше 1024 символов, то такой пост не сделать в телеге из за ограничений, убираем фото
+        if (photo is null) 
         {
-            logger.LogInformation($"В данном посте либо нет фотографии, либо текст слишком длинный для подобного поста, публикуем как текст");
-
-            if (vkPost.Text.Length > 4096)
-                return; // TODO: разделять на несколько постов
-                        // или в комментарии добавлять остаток текста
-
-            logger.LogInformation($"Посты уже был опубликован, пытаемся обновить...");
+            //TODO: отработать удаление фото из поста
+            // ... но надо ли?
             try
             {
                 await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId, telegramText, ParseMode.Html);
@@ -150,13 +162,8 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
                 if (ex.Message.Contains("there is no text in the message to edit"))
                     context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
             }
-            logger.LogInformation($"Пост обновлен");
-
-            return;
         }
-
-        logger.LogInformation($"Посты уже был опубликован, пытаемся обновить...");
-        if (photo is not null)
+        else
         {
             // Потенциальная ошибка
             try
@@ -171,11 +178,9 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
             }
             catch { }
         }
-        else
-            await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId, telegramText);
-        logger.LogInformation($"Пост обновлен");
 
         context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
+        logger.LogInformation($"Пост обновлен");
     }
 
     private string UpdateMessageForTelegramPost(Post vkPost)
