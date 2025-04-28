@@ -114,6 +114,7 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
             if (vkPost.Attachments.FirstOrDefault(a => a.Type.ToLower() == "video") is not null)
             {
                 logger.LogInformation($"В данном посте присутствует видео и нет фото. Предположительно, пост с отправленным в ВК видео... скип");
+                context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
                 return;
             }
             logger.LogInformation($"В данном посте либо нет фотографии, публикуем как текст");
@@ -129,7 +130,6 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
                     telegramMessageId = (await bot.SendMessage(mainChat.Id, telegramText.Substring(0, textSplitStartIndex) + "\nПродолжение в комментариях...", ParseMode.Html)).Id;
                     await SendExtraTextAsComments(telegramText, textSplitStartIndex);
                 }
-                telegramMessageId = (await bot.SendMessage(mainChat.Id, telegramText, ParseMode.Html)).Id;
 
                 context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
             }
