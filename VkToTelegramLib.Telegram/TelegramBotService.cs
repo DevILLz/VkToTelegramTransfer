@@ -8,17 +8,20 @@ using Telegram.Bot.Types.ReplyMarkups;
 using VkToTelegramLib.Infrastructure;
 using VkToTelegramLib.Infrastructure.Interfaces;
 using VkToTelegramLib.Infrastructure.VkResponseObjects;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace VkToTelegramLib.Telegram;
 public partial class TelegramBotService(BotConfiguration config, IVkService vkApi, IDbContext context, ILogger<TelegramBotService> logger) : IDisposable
 {
     private const int maxTelegramMessageLength = 4064;
+    private const int maxTelegramPhotoMessageLength = 1024;
     private readonly IVkService vkApi = vkApi;
     private readonly IDbContext context = context;
     private readonly ILogger<TelegramBotService> logger = logger;
     private readonly BotConfiguration config = config;
     private ITelegramBotClient bot;
     private Timer checkTimer;
+    private ChatFullInfo mainChat;
 
     public bool Initialized { get; private set; }
 
@@ -42,7 +45,7 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
             new ReceiverOptions { AllowedUpdates = { } },
             cancellationToken: cancellationToken
         );
-
+        mainChat = bot.GetChat(new ChatId(config.TelegramChatId)).GetAwaiter().GetResult();
         Initialized = true;
     }
 
@@ -101,13 +104,6 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
 
     private async Task SendPostToGroup(Post vkPost)
     {
-        if (vkPost.Text.Length > maxTelegramMessageLength)
-            return; // TODO: разделять на несколько постов
-        // или в комментарии добавлять остаток текста
-        // на текущем моменте телеграмм не поддерживает посты с длинной выше 4064 (примерно)
-        // позже надо бы этим заняться
-        // На текущем этапе тут стоит баг, который будет постоянно проверять длинный пост...
-
         var photo = vkPost.Attachments.FirstOrDefault(a => a.Type == "photo")?.Photo.OrigPhoto.Url;
         var telegramText = UpdateMessageForTelegramPost(vkPost);
 
@@ -115,12 +111,25 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
 
         if (photo is null)
         {
+            if (vkPost.Attachments.FirstOrDefault(a => a.Type.ToLower() == "video") is not null)
+            {
+                logger.LogInformation($"В данном посте присутствует видео и нет фото. Предположительно, пост с отправленным в ВК видео... скип");
+                return;
+            }
             logger.LogInformation($"В данном посте либо нет фотографии, публикуем как текст");
 
             //TODO: обработать добавление фоток в постах
             try
             {
-                telegramMessageId = (await bot.SendMessage(new ChatId(config.TelegramChatId), telegramText, ParseMode.Html)).Id;
+                if (vkPost.Text.Length <= maxTelegramMessageLength)
+                    telegramMessageId = (await bot.SendMessage(mainChat.Id, telegramText, ParseMode.Html)).Id;
+                else
+                {
+                    var textSplitStartIndex = telegramText.IndexOf(' ', maxTelegramPhotoMessageLength - 100);
+                    telegramMessageId = (await bot.SendMessage(mainChat.Id, telegramText.Substring(0, textSplitStartIndex) + "\nПродолжение в комментариях...", ParseMode.Html)).Id;
+                    await SendExtraTextAsComments(telegramText, textSplitStartIndex);
+                }
+                telegramMessageId = (await bot.SendMessage(mainChat.Id, telegramText, ParseMode.Html)).Id;
 
                 context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
             }
@@ -132,9 +141,41 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
             return;
         }
 
-        telegramMessageId = (await bot.SendPhoto(new ChatId(config.TelegramChatId), photo, telegramText, ParseMode.Html)).Id;
+        if (vkPost.Text.Length <= maxTelegramPhotoMessageLength)
+            telegramMessageId = (await bot.SendPhoto(mainChat.Id, photo, telegramText, ParseMode.Html)).Id;
+        else
+        {
+            var textSplitStartIndex = telegramText.IndexOf(' ', maxTelegramPhotoMessageLength - 100);
+            telegramMessageId = (await bot.SendPhoto(mainChat.Id, photo, telegramText.Substring(0, textSplitStartIndex) + "\nПродолжение в комментариях...", ParseMode.Html)).Id;
+            await SendExtraTextAsComments(telegramText, textSplitStartIndex);
+        }
 
         context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
+    }
+
+    private async Task SendExtraTextAsComments(string telegramText, int textSplitStartIndex)
+    {
+        Thread.Sleep(10_000);
+        if (mainChat.LinkedChatId is not null)
+        {
+            var linkedChat = await bot.GetChat(new ChatId(mainChat.LinkedChatId.Value));
+            var reply = new ReplyParameters { MessageId = linkedChat.PinnedMessage.Id };
+            var lastText = telegramText.Substring(textSplitStartIndex + 1);
+
+            if (lastText.Length <= maxTelegramMessageLength)
+                await bot.SendMessage(new ChatId(linkedChat.Id), lastText, replyParameters: reply, parseMode: ParseMode.Html);
+            else
+                do
+                {
+                    textSplitStartIndex = telegramText.IndexOf(' ', maxTelegramMessageLength - 100);
+                    var currentMessageText = lastText.Substring(0, textSplitStartIndex);
+
+                    await bot.SendMessage(new ChatId(linkedChat.Id), currentMessageText, replyParameters: reply, parseMode: ParseMode.Html);
+
+                    lastText = telegramText.Substring(textSplitStartIndex + 1);
+                }
+                while (lastText.Length > 1024);
+        }
     }
 
     private async Task UpdatePostToGroup(Post vkPost, int telegramMessageId)
@@ -145,6 +186,7 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
 
         var photo = vkPost.Attachments.FirstOrDefault(a => a.Type == "photo")?.Photo.OrigPhoto.Url;
         var telegramText = UpdateMessageForTelegramPost(vkPost);
+        var chatId = new ChatId(config.TelegramChatId);
 
         if (photo is null) 
         {
@@ -152,7 +194,7 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
             // ... но надо ли?
             try
             {
-                await bot.EditMessageText(new ChatId(config.TelegramChatId), telegramMessageId, telegramText, ParseMode.Html);
+                await bot.EditMessageText(chatId, telegramMessageId, telegramText, ParseMode.Html);
 
                 context.AddOrUpdatePostInDb(vkPost, telegramMessageId);
             }
@@ -169,12 +211,12 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
             try
             { // если попытаться обновить фото в посте, где изменился только текст, то этот запрос выкинет исключение
               // и, почему-то, при обновлении картинки, стирается весь текст =(
-                await bot.EditMessageMedia(new ChatId(config.TelegramChatId), telegramMessageId, new InputMediaPhoto(photo));
+                await bot.EditMessageMedia(chatId, telegramMessageId, new InputMediaPhoto(photo));
             }
             catch { }
             try
             { // по этому текст обновляем принудительно всегда в таких постах
-                await bot.EditMessageCaption(new ChatId(config.TelegramChatId), telegramMessageId, telegramText, ParseMode.Html);
+                await bot.EditMessageCaption(chatId, telegramMessageId, telegramText, ParseMode.Html);
             }
             catch { }
         }
@@ -188,9 +230,10 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
         var addiditionalInfo = $"\n\n<a href=\"{config.VkLink}\">Группа ВК</a>\n"
             + config.HashTegs;
 
-        var pattern = @"\[(https?:\/\/[^\|\]]+)\|([^\]]+)\]";
+        var patternLinks = @"\[(https?:\/\/[^\|\]]+)\|([^\]]+)\]";
+        var patternVkId = @"\[(id\d+)\|([^\]]+)\]";
 
-        return Regex.Replace(vkPost.Text, pattern, m =>
+        var text = Regex.Replace(vkPost.Text, patternLinks, m =>
         {
             var url = m.Groups[1].Value;
 
@@ -203,6 +246,14 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
 
             return $"<a href=\"{url}\">{text}</a>";
         }) + addiditionalInfo;
+        text = Regex.Replace(text, patternVkId, match =>
+        {
+            string id = match.Groups[1].Value;
+            string name = match.Groups[2].Value;
+            return $"\n\n<a href=\"https://vk.com/{id}\">{name}</a>\n";
+        });
+
+        return text;
     }
 
     private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
