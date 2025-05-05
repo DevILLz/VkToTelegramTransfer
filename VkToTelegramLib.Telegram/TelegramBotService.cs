@@ -80,7 +80,8 @@ public partial class TelegramBotService(BotConfiguration config, IVkService vkAp
         latestPosts.Reverse(); // в обратном порядке публикуем
         foreach (var post in latestPosts)
         {
-            logger.LogInformation($"Проверка поста {post.Id}. Текст: {post.Text.Substring(0, 30)}...");
+            var maxTextPreviewLength = post.Text.Length < 30 ? post.Text.Length : 30;
+            logger.LogInformation($"Проверка поста {post.Id}. Текст: {post.Text.Substring(0, maxTextPreviewLength)}...");
             var messageLink = context.GetMessageLink(post) ?? throw new Exception("Ошибка при запросе MessageLink");
 
             //context.DebugRequest();
